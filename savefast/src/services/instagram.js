@@ -120,21 +120,55 @@ async function resolve(url) {
     console.log('[Instagram Scraper] Requesting fallback API...');
     const apiRes = await fetchWithRetry(`https://backend1.tioo.eu.org/igdl?url=${encodeURIComponent(url)}`, { timeout: 8000 });
     
-    if (apiRes.data && apiRes.data.status && apiRes.data.result) {
-      const resData = apiRes.data.result;
-      if (resData.length > 0) {
-        const formats = resData.map((item, idx) => {
-          const isVideo = item.url.includes('.mp4') || item.url.includes('/v/') || item.url.includes('cdninstagram.com');
-          return {
-            quality: isVideo ? `High Definition HD (Format ${idx + 1})` : `Original Quality (Format ${idx + 1})`,
-            extension: isVideo ? 'mp4' : 'jpg',
-            url: item.url
-          };
-        });
+    let resData = null;
+    if (apiRes && apiRes.data) {
+      if (Array.isArray(apiRes.data)) {
+        resData = apiRes.data;
+      } else if (apiRes.data.result) {
+        resData = apiRes.data.result;
+      } else if (apiRes.data.status && Array.isArray(apiRes.data.data)) {
+        resData = apiRes.data.data;
+      }
+    }
 
+    if (resData && resData.length > 0) {
+      const formats = resData.map((item, idx) => {
+        const mediaUrl = typeof item === 'string' ? item : (item.url || item.url_download);
+        if (!mediaUrl) return null;
+
+        let isVideo = false;
+        try {
+          if (mediaUrl.includes('token=')) {
+            const token = mediaUrl.split('token=')[1].split('&')[0];
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payload = parts[1];
+              const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+              const innerUrl = decoded.url || '';
+              const filename = decoded.filename || '';
+              isVideo = innerUrl.includes('.mp4') || filename.includes('.mp4') || decoded.type === 'video';
+            }
+          }
+        } catch (jwtErr) {
+          console.warn('[Instagram Scraper] Failed to decode JWT token from mediaUrl:', jwtErr.message);
+        }
+
+        if (!isVideo) {
+          const filename = item.filename || '';
+          isVideo = mediaUrl.includes('.mp4') || mediaUrl.includes('/v/') || mediaUrl.includes('cdninstagram.com') || filename.includes('.mp4') || item.type === 'video';
+        }
+        
+        return {
+          quality: isVideo ? `High Definition HD (Format ${idx + 1})` : `Original Quality (Format ${idx + 1})`,
+          extension: isVideo ? 'mp4' : 'jpg',
+          url: mediaUrl
+        };
+      }).filter(Boolean);
+
+      if (formats.length > 0) {
         return {
           title: 'Instagram Post Media',
-          thumbnail: resData[0].thumbnail || resData[0].url,
+          thumbnail: (resData[0] && resData[0].thumbnail) || (resData[0] && resData[0].url) || url,
           duration: '00:00',
           formats
         };
