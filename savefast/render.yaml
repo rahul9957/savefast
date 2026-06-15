@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: savefast-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: "https://savefast.in,https://savefast-45e97.firebaseapp.com,https://savefast-45e97.web.app"
+      - key: ADMIN_API_KEY
+        value: "generate-a-secure-random-token-here"
+      - key: FIREBASE_PROJECT_ID
+        value: "savefast-45e97"
+      - key: FIREBASE_CLIENT_EMAIL
+        value: ""
+      - key: FIREBASE_PRIVATE_KEY
+        value: ""
